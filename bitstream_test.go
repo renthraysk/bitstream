@@ -46,7 +46,7 @@ func BenchmarkWriteBit(b *testing.B) {
 	w := NewWriter(ioutil.Discard)
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		if err := w.WriteBit(i&1 == 1); err != nil {
+		if err := w.WriteBit(uint64(i) & 1); err != nil {
 			b.Fatalf("WriteBit failed: %v", err)
 		}
 	}

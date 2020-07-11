@@ -6,13 +6,6 @@ import (
 	"math/bits"
 )
 
-func boolToUint64(b bool) uint64 {
-	if b {
-		return 1
-	}
-	return 0
-}
-
 // Writer bit writer using a 64 bit buffer
 type Writer struct {
 	b   uint64
@@ -26,16 +19,20 @@ func NewWriter(w io.Writer) *Writer {
 }
 
 // WriteBit writes a single bit
-func (w *Writer) WriteBit(b bool) error {
-	// :( unable to split this so the 98% path (where c == 0) is able to be inlined.
-	x, c := bits.Add64(w.b, w.b, boolToUint64(b))
-	if c == 0 {
-		w.b = x
+// x must be 0 or 1; otherwise the behavior is undefined.
+func (w *Writer) WriteBit(x uint64) error {
+	// This is written in such away to be inlinable (go 1.14)
+	w.b, x = bits.Add64(w.b, w.b, x)
+	if x == 0 {
 		return nil
 	}
-	binary.BigEndian.PutUint64(w.buf[:8], x)
-	_, err := w.w.Write(w.buf[:8])
+	return w.flush()
+}
+
+func (w *Writer) flush() error {
+	binary.BigEndian.PutUint64(w.buf[:8], w.b)
 	w.b = 1
+	_, err := w.w.Write(w.buf[:8])
 	return err
 }
 
@@ -64,23 +61,23 @@ func NewReader(r io.Reader) *Reader {
 }
 
 // ReadBit reads a bit from the underlying reader
-func (r *Reader) ReadBit() (bool, error) {
+func (r *Reader) ReadBit() (uint64, error) {
 	// :( again splitting this function doesn't give desired inlineability for 96% of calls.
 	x, c := bits.Add64(r.b, r.b, 0)
 	if c == 0 {
 		r.b = x
-		return x&(1<<32) != 0, nil
+		return (x >> 32) & 1, nil
 	}
 	n, err := r.r.Read(r.buf[:4])
 	if err != nil {
-		return false, err
+		return 0, err
 	}
 	if n == 0 {
-		return false, io.EOF
+		return 0, io.EOF
 	}
 	var cc uint32
 	y := binary.BigEndian.Uint32(r.buf[:4])
 	y, cc = bits.Add32(y, y, 0)
 	r.b = 1<<(64-8*n) | uint64(y)
-	return cc != 0, nil
+	return uint64(cc), nil
 }
