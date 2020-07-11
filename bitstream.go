@@ -82,7 +82,7 @@ func (r *Reader) fill() (c uint64, err error) {
 		return 0, io.EOF
 	}
 	y := binary.BigEndian.Uint64(r.buf[:8])
-	// Pop a bit off freeing a bit for the sentinel
+	// Pop a bit off ensuring a free bit for the sentinel
 	y, c = bits.Add64(y, y, 0)
 	r.b = y | 1<<(64-8*n)
 	return
