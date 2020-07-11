@@ -51,7 +51,7 @@ func (w *Writer) Flush() error {
 
 // Reader reads individual bits from a underlying io.Reader
 type Reader struct {
-	b   uint64 // This is 2 32 bit values, upper 32 contains a single sentinel bit tracking, lower 32 is our read buffer
+	b   uint64 // Upto 63 buffered bits, and one sentinel bit
 	r   io.Reader
 	buf [8]byte
 }
@@ -65,24 +65,25 @@ func NewReader(r io.Reader) *Reader {
 func (r *Reader) ReadBit() (c uint64, err error) {
 	r.b, c = bits.Add64(r.b, r.b, 0)
 	if r.b == 0 {
-		return r.read()
+		// Sentinel bit isn't present, need to fill buffer
+		return r.fill()
 	}
 	return
 }
 
-func (r *Reader) read() (uint64, error) {
+func (r *Reader) fill() (c uint64, err error) {
 	// clear buffer incase of short reads
 	binary.LittleEndian.PutUint64(r.buf[:8], 0)
 	n, err := r.r.Read(r.buf[:8])
 	if err != nil {
-		return 0, err
+		return
 	}
 	if n == 0 {
 		return 0, io.EOF
 	}
-	var c uint64
 	y := binary.BigEndian.Uint64(r.buf[:8])
+	// Pop a bit off freeing a bit for the sentinel
 	y, c = bits.Add64(y, y, 0)
-	r.b = uint64(y) | 1<<(64-8*n)
-	return c, nil
+	r.b = y | 1<<(64-8*n)
+	return
 }
