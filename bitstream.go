@@ -8,8 +8,8 @@ import (
 
 // Writer bit writer using a 64 bit buffer
 type Writer struct {
-	b   uint64
-	w   io.Writer
+	b   uint64    // 64 bit buffer
+	w   io.Writer // destination
 	buf [8]byte
 }
 
@@ -61,13 +61,15 @@ func NewReader(r io.Reader) *Reader {
 }
 
 // ReadBit reads a bit from the underlying reader
-func (r *Reader) ReadBit() (uint64, error) {
-	// :( again splitting this function doesn't give desired inlineability for 96% of calls.
-	x, c := bits.Add64(r.b, r.b, 0)
+func (r *Reader) ReadBit() (c uint64, err error) {
+	r.b, c = bits.Add64(r.b, r.b, 0)
 	if c == 0 {
-		r.b = x
-		return (x >> 32) & 1, nil
+		return (r.b >> 32) & 1, nil
 	}
+	return r.read()
+}
+
+func (r *Reader) read() (uint64, error) {
 	n, err := r.r.Read(r.buf[:4])
 	if err != nil {
 		return 0, err
@@ -75,9 +77,9 @@ func (r *Reader) ReadBit() (uint64, error) {
 	if n == 0 {
 		return 0, io.EOF
 	}
-	var cc uint32
+	var c uint32
 	y := binary.BigEndian.Uint32(r.buf[:4])
-	y, cc = bits.Add32(y, y, 0)
+	y, c = bits.Add32(y, y, 0)
 	r.b = 1<<(64-8*n) | uint64(y)
-	return uint64(cc), nil
+	return uint64(c), nil
 }
