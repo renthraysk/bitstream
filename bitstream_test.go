@@ -53,6 +53,15 @@ func BenchmarkWriteBit(b *testing.B) {
 	w.Flush()
 }
 
+func BenchmarkBufferWriteBit(b *testing.B) {
+	w := NewWriterBuffer()
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		w.WriteBit(uint64(i) & 1)
+	}
+	w.Bytes()
+}
+
 func BenchmarkReadBit(b *testing.B) {
 	r := NewReader(rand.Reader)
 	b.ReportAllocs()
