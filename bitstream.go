@@ -1,6 +1,7 @@
 package bitstream
 
 import (
+	"bufio"
 	"encoding/binary"
 	"io"
 	"math/bits"
@@ -57,7 +58,7 @@ type Reader struct {
 
 // NewReader returns a Reader
 func NewReader(r io.Reader) *Reader {
-	return &Reader{r: r, b: 1 << 63}
+	return &Reader{r: bufio.NewReader(r), b: 1 << 63}
 }
 
 // ReadBit reads a bit from the underlying reader

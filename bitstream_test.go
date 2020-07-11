@@ -45,8 +45,9 @@ func TestCopy(t *testing.T) {
 func BenchmarkWriteBit(b *testing.B) {
 	w := NewWriter(ioutil.Discard)
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
-		if err := w.WriteBit(uint64(i) & 1); err != nil {
+		if err := w.WriteBit(1); err != nil {
 			b.Fatalf("WriteBit failed: %v", err)
 		}
 	}
@@ -56,8 +57,9 @@ func BenchmarkWriteBit(b *testing.B) {
 func BenchmarkBufferWriteBit(b *testing.B) {
 	w := NewWriterBuffer()
 	b.ReportAllocs()
+
 	for i := 0; i < b.N; i++ {
-		w.WriteBit(uint64(i) & 1)
+		w.WriteBit(1)
 	}
 	w.Bytes()
 }

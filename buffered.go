@@ -17,10 +17,9 @@ func NewWriterBuffer() *WriterBuffer {
 func (w *WriterBuffer) WriteBit(x uint64) {
 	w.b, x = bits.Add64(w.b, w.b, x)
 	if x != 0 {
-		x = w.b
+		w.out = append(w.out, byte(w.b>>56), byte(w.b>>48), byte(w.b>>40), byte(w.b>>32),
+			byte(w.b>>24), byte(w.b>>16), byte(w.b>>8), byte(w.b))
 		w.b = 1
-		w.out = append(w.out, byte(x>>56), byte(x>>48), byte(x>>40), byte(x>>32),
-			byte(x>>24), byte(x>>16), byte(x>>8), byte(x))
 	}
 }
 
