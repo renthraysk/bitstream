@@ -1,7 +1,6 @@
 package bitstream
 
 import (
-	"crypto/rand"
 	"io/ioutil"
 	"testing"
 
@@ -54,18 +53,17 @@ func BenchmarkWriteBit(b *testing.B) {
 	w.Flush()
 }
 
-func BenchmarkBufferWriteBit(b *testing.B) {
-	w := NewWriterBuffer()
-	b.ReportAllocs()
+type Reader55 struct{}
 
-	for i := 0; i < b.N; i++ {
-		w.WriteBit(1)
+func (Reader55) Read(b []byte) (int, error) {
+	for i := range b {
+		b[i] = 0x55
 	}
-	w.Bytes()
+	return len(b), nil
 }
 
 func BenchmarkReadBit(b *testing.B) {
-	r := NewReader(rand.Reader)
+	r := NewReader(&Reader55{})
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		if _, err := r.ReadBit(); err != nil {
