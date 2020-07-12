@@ -2,6 +2,7 @@ package bitstream
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/binary"
 	"io"
 	"math/bits"
@@ -24,10 +25,11 @@ func NewWriter(w io.Writer) *Writer {
 func (w *Writer) WriteBit(x uint64) error {
 	// This is written in such away to be inlinable (go 1.14)
 	w.b, x = bits.Add64(w.b, w.b, x)
-	if x == 0 {
-		return nil
+	if x != 0 {
+		// Sentinel bit carried off, w.b is full
+		return w.flush()
 	}
-	return w.flush()
+	return nil
 }
 
 func (w *Writer) flush() error {
@@ -51,27 +53,33 @@ func (w *Writer) Flush() error {
 
 // Reader reads individual bits from a underlying io.Reader
 type Reader struct {
-	b   uint64 // Upto 63 buffered bits, and one sentinel bit
+	b   uint64 // Upto 63 buffered bits, and one set sentinel bit
 	r   io.Reader
 	buf [8]byte
 }
 
 // NewReader returns a Reader
 func NewReader(r io.Reader) *Reader {
+	if _, ok := r.(*bytes.Reader); ok {
+		return &Reader{r: r}
+	}
+	if _, ok := r.(*bufio.Reader); ok {
+		return &Reader{r: r}
+	}
 	return &Reader{r: bufio.NewReader(r)}
 }
 
 // ReadBit reads a bit from the underlying reader
-func (r *Reader) ReadBit() (c uint64, err error) {
-	r.b, c = bits.Add64(r.b, r.b, 0)
+func (r *Reader) ReadBit() (b uint64, err error) {
+	r.b, b = bits.Add64(r.b, r.b, 0)
 	if r.b == 0 {
-		// Sentinel bit isn't present, need to fill buffer
+		// Sentinel bit is no longer present, need to fill buffer
 		return r.fill()
 	}
 	return
 }
 
-func (r *Reader) fill() (c uint64, err error) {
+func (r *Reader) fill() (b uint64, err error) {
 	// clear buffer incase of short reads
 	binary.LittleEndian.PutUint64(r.buf[:8], 0)
 	n, err := r.r.Read(r.buf[:8])
@@ -81,9 +89,9 @@ func (r *Reader) fill() (c uint64, err error) {
 	if n == 0 {
 		return 0, io.EOF
 	}
-	y := binary.BigEndian.Uint64(r.buf[:8])
+	x := binary.BigEndian.Uint64(r.buf[:8])
 	// Pop a bit off ensuring a free bit for the sentinel
-	y, c = bits.Add64(y, y, 0)
-	r.b = y | 1<<(64-8*n)
+	x, b = bits.Add64(x, x, 0)
+	r.b = x | 1<<(64-8*n)
 	return
 }

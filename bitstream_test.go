@@ -1,6 +1,8 @@
 package bitstream
 
 import (
+	"crypto/rand"
+	"io"
 	"io/ioutil"
 	"testing"
 
@@ -70,4 +72,53 @@ func BenchmarkReadBit(b *testing.B) {
 			b.Fatalf("ReadBit failed: %v", err)
 		}
 	}
+}
+
+func Rand(b *testing.B, n int64) []byte {
+	b.Helper()
+	buf := make([]byte, n)
+	if _, err := rand.Read(buf); err != nil {
+		b.Fatalf("failed to read rand: %v", err)
+	}
+	return buf
+}
+
+func BenchCopy(b *testing.B, n int64) {
+	b.Helper()
+
+	ww := &bytes.Buffer{}
+	rr := bytes.NewReader(Rand(b, n))
+
+	b.ResetTimer()
+	b.ReportAllocs()
+	b.SetBytes(n)
+
+	for i := 0; i < b.N; i++ {
+		ww.Reset()
+		rr.Seek(0, io.SeekStart)
+
+		r := NewReader(rr)
+		w := NewWriter(ww)
+
+		for b, err := r.ReadBit(); err == nil; b, err = r.ReadBit() {
+			w.WriteBit(b)
+		}
+		w.Flush()
+	}
+}
+
+func BenchmarkRate256(b *testing.B) {
+	BenchCopy(b, 256)
+}
+
+func BenchmarkRate1K(b *testing.B) {
+	BenchCopy(b, 1024)
+}
+
+func BenchmarkRate4K(b *testing.B) {
+	BenchCopy(b, 4096)
+}
+
+func BenchmarkRate10K(b *testing.B) {
+	BenchCopy(b, 10240)
 }
