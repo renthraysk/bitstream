@@ -39,6 +39,29 @@ func (w *Writer) flush() error {
 	return err
 }
 
+// WriteByte writes a single byte
+func (w *Writer) WriteByte(b byte) error {
+	// As the sentinel bit is highest bit set
+	// can use a simple compare to see if have enough empty bits available
+	const max = ^uint64(0) >> 8
+	if w.b <= max {
+		w.b = w.b<<8 | uint64(b)
+		return nil
+	}
+	return w.writeByte(b)
+}
+
+func (w *Writer) writeByte(b byte) error {
+	n := bits.Len64(w.b) - 1
+	binary.BigEndian.PutUint64(w.buf[:8], w.b<<(64-n))
+	s := uint64(1) << (n - 7*8)
+	w.b &= s - 1
+	w.b |= s
+	w.b = w.b<<8 | uint64(b)
+	_, err := w.w.Write(w.buf[:7])
+	return err
+}
+
 // Flush flushes any bits in the buffer to the output, it pads the output to nearest byte boundary with zero bits.
 func (w *Writer) Flush() error {
 	n := bits.Len64(w.b) - 1 // -1 for sentinel bit

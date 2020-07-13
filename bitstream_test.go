@@ -122,3 +122,30 @@ func BenchmarkRate4K(b *testing.B) {
 func BenchmarkRate10K(b *testing.B) {
 	BenchCopy(b, 10240)
 }
+
+func TestWriteByte(t *testing.T) {
+
+	tests := []struct {
+		in       []byte
+		expected []byte
+	}{
+		{in: []byte{0xFF}, expected: []byte{0x7F, 0x80}},
+		{in: []byte{0xFF, 0x00}, expected: []byte{0x7F, 0x80, 0x00}},
+		{in: []byte{0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00}, expected: []byte{0x7F, 0x80, 0x7F, 0x80, 0x7F, 0x80, 0x7F, 0x80, 0x00}},
+	}
+
+	for _, ts := range tests {
+		ww := &bytes.Buffer{}
+		w := NewWriter(ww)
+
+		w.WriteBit(0)
+
+		for _, x := range ts.in {
+			w.WriteByte(x)
+		}
+		w.Flush()
+		if !bytes.Equal(ww.Bytes(), ts.expected) {
+			t.Fatalf("failure expected %x, got %x", ts.expected, ww.Bytes())
+		}
+	}
+}
