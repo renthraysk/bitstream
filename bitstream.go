@@ -63,9 +63,6 @@ func NewReader(r io.Reader) *Reader {
 	if _, ok := r.(*bytes.Reader); ok {
 		return &Reader{r: r}
 	}
-	if _, ok := r.(*bufio.Reader); ok {
-		return &Reader{r: r}
-	}
 	return &Reader{r: bufio.NewReader(r)}
 }
 
