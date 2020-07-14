@@ -27,12 +27,12 @@ func (w *Writer) WriteBit(x uint64) error {
 	w.b, x = bits.Add64(w.b, w.b, x)
 	if x != 0 {
 		// Sentinel bit carried off, w.b is full
-		return w.flush()
+		return w.flushAll()
 	}
 	return nil
 }
 
-func (w *Writer) flush() error {
+func (w *Writer) flushAll() error {
 	binary.BigEndian.PutUint64(w.buf[:8], w.b)
 	w.b = 1
 	_, err := w.w.Write(w.buf[:8])
@@ -40,37 +40,44 @@ func (w *Writer) flush() error {
 }
 
 // WriteByte writes a single byte
-func (w *Writer) WriteByte(b byte) error {
+func (w *Writer) WriteByte(b byte) (err error) {
 	// As the sentinel bit is highest bit set
 	// can use a simple compare to see if have enough empty bits available
-	const max = ^uint64(0) >> 8
-	if w.b <= max {
-		w.b = w.b<<8 | uint64(b)
-		return nil
+	if w.b >= (1 << 56) {
+		err = w.flush()
 	}
-	return w.writeByte(b)
+	w.b = w.b<<8 | uint64(b)
+	return
 }
 
-func (w *Writer) writeByte(b byte) error {
+// WriteBits writes the lowest n bits of x, with the most significant bit of the lower n bits first.
+func (w *Writer) WriteBits(x uint32, n int) (err error) {
+	if w.b >= (1 << 32) {
+		err = w.flush()
+	}
+	w.b = w.b<<n | uint64(x)
+	return
+}
+
+func (w *Writer) flush() error {
 	n := bits.Len64(w.b) - 1
 	binary.BigEndian.PutUint64(w.buf[:8], w.b<<(64-n))
-	s := uint64(1) << (n - 7*8)
-	w.b &= s - 1
-	w.b |= s
-	w.b = w.b<<8 | uint64(b)
-	_, err := w.w.Write(w.buf[:7])
+	_, err := w.w.Write(w.buf[:n>>3])
+
+	s := uint64(1) << (n & 7)
+	w.b = s | (w.b & (s - 1))
 	return err
 }
 
 // Flush flushes any bits in the buffer to the output, it pads the output to nearest byte boundary with zero bits.
 func (w *Writer) Flush() error {
-	n := bits.Len64(w.b) - 1 // -1 for sentinel bit
-	if n == 0 {
+	n := bits.Len64(w.b) // n includes sentinel bit
+	if n <= 1 {
 		return nil
 	}
-	binary.BigEndian.PutUint64(w.buf[:8], w.b<<(64-n))
+	binary.BigEndian.PutUint64(w.buf[:8], w.b<<(65-n))
 	w.b = 1
-	_, err := w.w.Write(w.buf[:(n+7)/8])
+	_, err := w.w.Write(w.buf[:(n+6)/8])
 	return err
 }
 
