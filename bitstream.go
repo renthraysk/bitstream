@@ -43,7 +43,7 @@ func (w *Writer) flushAll() error {
 func (w *Writer) WriteByte(b byte) (err error) {
 	// As the sentinel bit is highest bit set
 	// can use a simple compare to see if have enough empty bits available
-	if w.b >= (1 << 56) {
+	if w.b >= 1<<56 {
 		err = w.flush()
 	}
 	w.b = w.b<<8 | uint64(b)
@@ -51,8 +51,8 @@ func (w *Writer) WriteByte(b byte) (err error) {
 }
 
 // WriteBits writes the lowest n bits of x, with the most significant bit of the lower n bits first.
-func (w *Writer) WriteBits(x uint32, n int) (err error) {
-	if w.b >= (1 << 32) {
+func (w *Writer) WriteBits(x uint16, n int) (err error) {
+	if w.b >= 1<<48 {
 		err = w.flush()
 	}
 	w.b = w.b<<n | uint64(x)
@@ -62,10 +62,9 @@ func (w *Writer) WriteBits(x uint32, n int) (err error) {
 func (w *Writer) flush() error {
 	n := bits.Len64(w.b) - 1
 	binary.BigEndian.PutUint64(w.buf[:8], w.b<<(64-n))
-	_, err := w.w.Write(w.buf[:n>>3])
-
 	s := uint64(1) << (n & 7)
 	w.b = s | (w.b & (s - 1))
+	_, err := w.w.Write(w.buf[:n>>3])
 	return err
 }
 

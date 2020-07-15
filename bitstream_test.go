@@ -149,3 +149,36 @@ func TestWriteByte(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteBits(t *testing.T) {
+
+	tests := []struct {
+		x        uint16
+		n        int
+		expected []byte
+	}{
+		{0b0, 1, []byte{0x00}},
+		{0b1, 1, []byte{0x80}},
+		{0b11, 2, []byte{0xC0}},
+		{0b111, 3, []byte{0xE0}},
+		{0b1111, 4, []byte{0xF0}},
+		{0b1111111, 7, []byte{0xFE}},
+		{0b11111111, 8, []byte{0xFF}},
+		{0b111111111, 9, []byte{0xFF, 0x80}},
+		{^uint16(0), 16, []byte{0xFF, 0xFF}},
+	}
+
+	for _, ts := range tests {
+		ww := &bytes.Buffer{}
+		w := NewWriter(ww)
+
+		w.WriteBits(ts.x, ts.n)
+
+		w.Flush()
+		if !bytes.Equal(ww.Bytes(), ts.expected) {
+			t.Fatalf("failure expected %x, got %x", ts.expected, ww.Bytes())
+		}
+
+	}
+
+}
