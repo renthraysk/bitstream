@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"io"
 	"io/ioutil"
+	"strconv"
 	"testing"
 
 	"bytes"
@@ -123,62 +124,55 @@ func BenchmarkRate10K(b *testing.B) {
 	BenchCopy(b, 10240)
 }
 
-func TestWriteByte(t *testing.T) {
-
-	tests := []struct {
-		in       []byte
-		expected []byte
-	}{
-		{in: []byte{0xFF}, expected: []byte{0x7F, 0x80}},
-		{in: []byte{0xFF, 0x00}, expected: []byte{0x7F, 0x80, 0x00}},
-		{in: []byte{0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00}, expected: []byte{0x7F, 0x80, 0x7F, 0x80, 0x7F, 0x80, 0x7F, 0x80, 0x00}},
-	}
-
-	for _, ts := range tests {
-		ww := &bytes.Buffer{}
-		w := NewWriter(ww)
-
-		w.WriteBit(0)
-
-		for _, x := range ts.in {
-			w.WriteByte(x)
-		}
-		w.Flush()
-		if !bytes.Equal(ww.Bytes(), ts.expected) {
-			t.Fatalf("failure expected %x, got %x", ts.expected, ww.Bytes())
-		}
-	}
-}
-
 func TestWriteBits(t *testing.T) {
 
+	type wb struct {
+		x uint16
+		n int
+	}
+
 	tests := []struct {
-		x        uint16
-		n        int
+		pre      wb
+		bytes    []byte
+		post     wb
 		expected []byte
 	}{
-		{0b0, 1, []byte{0x00}},
-		{0b1, 1, []byte{0x80}},
-		{0b11, 2, []byte{0xC0}},
-		{0b111, 3, []byte{0xE0}},
-		{0b1111, 4, []byte{0xF0}},
-		{0b1111111, 7, []byte{0xFE}},
-		{0b11111111, 8, []byte{0xFF}},
-		{0b111111111, 9, []byte{0xFF, 0x80}},
-		{^uint16(0), 16, []byte{0xFF, 0xFF}},
+		0:  {pre: wb{x: 0b0, n: 1}, expected: []byte{0x00}},
+		1:  {pre: wb{x: 0b1, n: 1}, expected: []byte{0x80}},
+		2:  {pre: wb{x: 0b11, n: 2}, expected: []byte{0xC0}},
+		3:  {pre: wb{x: 0b111, n: 3}, expected: []byte{0xE0}},
+		4:  {pre: wb{x: 0b1111, n: 4}, expected: []byte{0xF0}},
+		5:  {pre: wb{x: 0b1111111, n: 7}, expected: []byte{0xFE}},
+		6:  {pre: wb{x: 0b11111111, n: 8}, expected: []byte{0xFF}},
+		7:  {pre: wb{x: 0b111111111, n: 9}, expected: []byte{0xFF, 0x80}},
+		8:  {pre: wb{x: ^uint16(0), n: 16}, expected: []byte{0xFF, 0xFF}},
+		9:  {pre: wb{x: 0, n: 1}, bytes: []byte{0xFF}, expected: []byte{0x7F, 0x80}},
+		10: {pre: wb{x: 0, n: 1}, bytes: []byte{0xFF, 0x00}, expected: []byte{0x7F, 0x80, 0x00}},
+		11: {pre: wb{x: 0, n: 1}, bytes: []byte{0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00}, expected: []byte{0x7F, 0x80, 0x7F, 0x80, 0x7F, 0x80, 0x7F, 0x80, 0x00}},
+		12: {pre: wb{x: 0, n: 1}, bytes: []byte{0xFF}, expected: []byte{0x7F, 0x80}},
+
+		13: {bytes: []byte{0, 0xFF, 0, 0xFF, 0, 0xFF, 0x00}, post: wb{x: 0xF, n: 4}, expected: []byte{0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xF0}},
 	}
+	for i, ts := range tests {
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			ww := &bytes.Buffer{}
+			w := NewWriter(ww)
 
-	for _, ts := range tests {
-		ww := &bytes.Buffer{}
-		w := NewWriter(ww)
+			if ts.pre.n > 0 {
+				w.WriteBits(ts.pre.x, ts.pre.n)
+			}
+			for _, x := range ts.bytes {
+				w.WriteByte(x)
+			}
+			if ts.post.n > 0 {
+				w.WriteBits(ts.post.x, ts.post.n)
+			}
+			w.Flush()
 
-		w.WriteBits(ts.x, ts.n)
+			if !bytes.Equal(ww.Bytes(), ts.expected) {
+				t.Fatalf("failure expected %x, got %x", ts.expected, ww.Bytes())
 
-		w.Flush()
-		if !bytes.Equal(ww.Bytes(), ts.expected) {
-			t.Fatalf("failure expected %x, got %x", ts.expected, ww.Bytes())
-		}
-
+			}
+		})
 	}
-
 }

@@ -51,6 +51,7 @@ func (w *Writer) WriteByte(b byte) (err error) {
 }
 
 // WriteBits writes the lowest n bits of x, with the most significant bit of the lower n bits first.
+// n must be between 1 and 16.
 func (w *Writer) WriteBits(x uint16, n int) (err error) {
 	if w.b >= 1<<48 {
 		err = w.flush()
